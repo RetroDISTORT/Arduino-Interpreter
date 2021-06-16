@@ -1,0 +1,607 @@
+//UPDATES//
+Can Send Sting commands To Dysplay
+//////////////////////////////////
+Errors:
+Can't Solve Logic commands
+== >= <= !=
+////////////////////////////////////
+
+String Run(); //EXECUTES THE LINE STEP BY STEP
+String Clean(String comIn); //CLEANS THE STRING FROM UNKNOWN CHARACTERS
+String Variable(String comIn); //FINDS VARIABLES TO REPLACE FOR STRINGS
+String Arithmetic(String comIn); //SOLVE ARITHMETIC ECUATIONS
+String Logic(String comIn); //SOLVES BASIC LOGIC STRINGS
+String Hardware(String comIn); //EXECUTES HARDWARE COMANDS BASED ON SOLVED PARAMETERS
+String Capture(String comIn, int pos[]); //CAPTURES VARIABLES IN STRING
+String CaptureAdvance(String comIn, int pos[]); //CAPTURES VARIABLES AND STRING TYPE VARIABLES
+String Replace(String comIn, String newString, int P1, int P2); //REPLACE A PART OF A STRING FOR ANOTHER
+String EXECUTE(String com, String spar[], String & comIn, bool reset, int rep[]); //EXECUTES THE com WITH THE PARAMETERS
+String GET(String com, String spar[], String comIn); //GETS THE VARIABLE WITH THE PARAMETERS
+
+int var[16][16];    //int Variables (16x16 matrix Total:256)
+
+void setup() {
+  pinMode(32, OUTPUT);
+  digitalWrite(32, HIGH);
+  //pinMode(13, OUTPUT);
+  //digitalWrite(13, HIGH);
+  var[0][0] = 15;
+  var[0][1] = 16;
+  var[1][0] = 20;
+  Serial.begin(115200);
+  //Serial1.begin(250000);
+  //Serial2.begin(250000);
+  Serial3.begin(115200);
+  Serial.println("Enter your com.");
+}
+
+char rx_byte = 0;
+String command = "";
+
+void loop() {
+
+  while (1) {
+    if ( Serial3.available() > 0) {    // is a character available?
+      rx_byte = Serial3.read();       // get the character
+      if (rx_byte != '\n' and rx_byte != ';') {
+        // a character of the string was received
+        command += String(rx_byte);
+        Serial.print("char: ");
+        Serial.println(String(rx_byte));
+      }
+      else {
+        //if(com.substring(com.length()-3,com.length())!="ÿÿÿ")com=com.substring(com.length()+1,command.length()-3);
+        // end of string
+        command += rx_byte;
+        Serial.print("INPUT: ");
+        Serial.println(String(command));
+        Serial.println(Run());
+        command = "";                // clear the string for reuse
+        Serial.println("Enter your command.");
+      }
+    } // end: if (Serial.available() > 0)
+    //////////////////////////////////////////////////////////////
+
+  }
+}
+
+String Run() {
+  Serial.println("SOLVING");
+  Serial.println(command);
+  //command = Clean();
+  Serial.println("----------Clean---------");
+  Serial.println(command);
+  Serial.println("------------------------");
+  command = Variable(command);
+  Serial.println("----------Var-----------");
+  Serial.println(command);
+  Serial.println("------------------------");
+  command = Arithmetic(command);
+  Serial.println("-------ARITHMETIC-------");
+  Serial.println(command);
+  Serial.println("------------------------");
+  //command = Logic(command);
+  Serial.println("---------Logic----------");
+  Serial.println(command);
+  Serial.println("------------------------");
+  command = Hardware(command);
+  Serial.println("----------HRW-----------");
+  Serial.println(command);
+  Serial.println("------------------------");
+  return"";
+}
+
+String Clean() {
+  for (int z = 0;  z < command.length(); z++) { //GO THROUGH CHARACTERS UNTIL IT FINDS THE END OF THE LINE
+    Serial.print("Z: ");
+    Serial.println(z);
+    Serial.print("Lenght: ");
+    Serial.println(command.length());
+    Serial.print("CHAR: ");
+    Serial.print( command.charAt(z));
+    if (command[z] <= 0x126 or (command[z] <= 0x31)) {
+      command = command.substring(0, z) + command.substring(z + 1, command.length());
+      Serial.println(" ...Replaced!");
+    }
+    else {
+      Serial.println(" ");
+    }
+    Serial.print("check: ");
+    Serial.println(0 + command[z]);
+  }
+  Serial.println("DONE!");
+  return (command);
+}
+
+String Variable(String comIn) {
+  boolean part = 0; //[PART 0 SEARCH FOR GET COMMAND] [PART 1 GET VALUES OR ENDING]
+  String spar[10]; //PARAMETERS
+  int selector = 0; //SELECTS WHERE TO SAVE THE PARAMETER "INDEX"
+  int pos[2]; //POSITIONS START AND END OF PARAMETER
+  String com; //COMMAND TYPE
+  int rep[2]; //REPLACE PART OF STRING
+
+  for (int z = pos[0] = 0; comIn.charAt(z - 1) != '\n' and comIn.charAt(z - 1) != ';'; z++) { //GO THROUGH CHARACTERS UNTIL IT FINDS THE END OF THE LINE
+    if (part == 0) {
+      if (comIn.charAt(z) == '"') {
+        Serial.print("VALUE OF Z=");
+        Serial.println(z);
+        Serial.println("PASSED IF STATEMENT");
+        Serial.print("CHECKING IF STATEMENT...");
+        Serial.println(comIn.charAt(z) == '"');
+        Serial.print("CHAR AT Z...");
+        Serial.println(comIn.charAt(z));
+        z++;
+        while (comIn.charAt(z) != '"') {
+          z++;
+          Serial.print("CharSkip>>");
+          Serial.println(comIn.charAt(z));
+        }
+        z++;
+        Serial.print("Char afterSkip >>");
+        Serial.println(comIn.charAt(z));
+      }
+
+      if ((comIn.charAt(z) == '$')) { //GET COMMAND
+        com = comIn.substring(z + 1, z + 4);
+        z += 4;
+        pos[0] = z;
+        rep[0] = z - 4;
+        part = 1;
+      }
+    }
+    if (part == 1) {
+      if ((comIn.charAt(z) == '(') or (comIn.charAt(z) == '[')) { //STARTER
+        pos[0] = z + 1; //Set the cursor after this character
+      }
+      if ((comIn.charAt(z) == ',')) {//FIND SEPARATORS
+        pos[1] = z - 1; //Set the cursor before this character
+        spar[selector] = Capture(comIn, pos);
+        selector++;
+        pos[0] = z + 1; //Set the cursor after this character
+      }
+      if ((comIn.charAt(z) == ')') or (comIn.charAt(z) == ']')) {//FINISHER
+        pos[1] = z - 1; //Set the cursor before this character
+        spar[selector] = Capture(comIn, pos);
+        selector++;
+        pos[0] = z + 1; //Set the cursor after this character
+        rep[1] = z; // Sets the ending of the replace range
+        part = 0; //Restarts search of new '$'
+        selector = 0; //Restarts Parameter/index selector
+        z = 0; //Restarts cursor position
+        comIn = Replace(comIn, GET(com, spar, comIn), rep[0], rep[1]);
+      }
+    }
+  }
+  return (comIn);
+}
+
+String Hardware(String comIn) {
+  boolean part = 0; //[PART 0 SEARCH FOR GET COMMAND] [PART 1 GET VALUES OR ENDING]
+  String spar[10]; //PARAMETERS
+  int selector = 0; //SELECTS WHERE TO SAVE THE PARAMETER "INDEX"
+  int pos[2]; //POSITIONS START AND END OF PARAMETER
+  String com; //COMMAND TYPE
+  int rep[2]; //REPLACE PART OF STRING
+
+  for (int z = pos[0] = 0; comIn.charAt(z - 1) != '\n' and comIn.charAt(z - 1) != ';'; z++) { //GO THROUGH CHARACTERS UNTIL IT FINDS THE END OF THE LINE
+    Serial.print("CHAR AT Z=");
+    Serial.println(comIn.charAt(z));
+    if (part == 0) {
+      if ((comIn.charAt(z) == '#')) { //GET COMMAND
+        com = comIn.substring(z + 1, z + 4);
+        z += 4;
+        pos[0] = z;
+        rep[0] = z - 4;
+        part = 1;
+      }
+    }
+    Serial.print("CHAR AT Z=");
+    Serial.println(comIn.charAt(z));
+    if (part == 1) {
+      /////////////////STRING     COLLECTOR/////////////////////////
+      if (comIn.charAt(z) == '"') {
+        pos[0] = z;
+        Serial.print("VALUE OF Z=");
+        Serial.println(z);
+        Serial.println("PASSED IF STATEMENT");
+        Serial.print("CHECKING IF STATEMENT...");
+        Serial.println(comIn.charAt(z) == '"');
+        Serial.print("CHAR AT Z...");
+        Serial.println(comIn.charAt(z));
+        z++;
+        while (comIn.charAt(z) != '"') {
+          z++;
+          Serial.print("CharSkip>>");
+          Serial.println(comIn.charAt(z));
+        }
+        pos[1] = z;
+        z++;
+        spar[selector] = comIn.substring(pos[0] + 1, pos[1]);
+        Serial.print("String:");
+        Serial.println(spar[selector]);
+        Serial.print("Char afterSkip >>");
+        Serial.println(comIn.charAt(z));
+        selector++;
+        }
+      /////////////////STRING END COLLECTOR/////////////////////////
+      if (comIn.charAt(z) == '(') { //STARTER
+        pos[0] = z + 1; //Set the cursor after this character
+      }
+      if (comIn.charAt(z) == ',')  { //FIND SEPARATORS
+        pos[1] = z - 1; //Set the cursor before this character
+        spar[selector] = Capture(comIn, pos);
+        selector++;
+        pos[0] = z + 1; //Set the cursor after this character
+      }
+      if (comIn.charAt(z) == ')') { //FINISHER
+        Serial.print("caught end");
+        pos[1] = z - 1; //Set the cursor before this character
+        spar[selector] = Capture(comIn, pos);
+        selector++;
+        pos[0] = z + 1; //Set the cursor after this character
+        rep[1] = z; // Sets the ending of the replace range
+        part = 0; //Restarts search of new '$'
+        selector = 0; //Restarts Parameter/index selector
+        z = 0; //Restarts cursor position
+        comIn = Replace(comIn, EXECUTE(com, spar, comIn), rep[0], rep[1]);
+      }
+    }
+  }
+  return (comIn);
+}
+
+String Arithmetic(String comIn) { //FINDS VARIABLES TO REPLACE FOR STRINGS
+  int part = 0; //[PART 0 SEARCH FOR GET COMMAND] [PART 1 GET VALUES OR ENDING] [PART 3 EXECUTES]
+  String spar[10]; //PARAMETERS
+  int selector = 0; //SELECTS WHERE TO SAVE THE PARAMETER "INDEX"
+  int pos[2]; //POSITIONS START AND END OF PARAMETER
+  String com; //COMMAND TYPE
+  int rep[2]; //REPLACE PART OF STRING
+
+  for (int z = pos[0] = 0; comIn.charAt(z - 1) != '\n' and comIn.charAt(z - 1) != ';'; z++) { //GO THROUGH CHARACTERS UNTIL IT FINDS THE END OF THE LINE
+    if (part == 0) {
+      if (comIn.charAt(z) == '"') {
+        Serial.print("VALUE OF Z=");
+        Serial.println(z);
+        Serial.println("PASSED IF STATEMENT");
+        Serial.print("CHECKING IF STATEMENT...");
+        Serial.println(comIn.charAt(z) == '"');
+        Serial.print("CHAR AT Z...");
+        Serial.println(comIn.charAt(z));
+        z++;
+        while (comIn.charAt(z) != '"') {
+          z++;
+          Serial.print("CharSkip>>");
+          Serial.println(comIn.charAt(z));
+        }
+        z++;
+        Serial.print("Char afterSkip >>");
+        Serial.println(comIn.charAt(z));
+      }
+
+      if ((comIn.charAt(z) == '+' || comIn.charAt(z) == '-' || comIn.charAt(z) == '*' || comIn.charAt(z) == '/' ) && ((comIn.charAt(z - 1) >= '0' and comIn.charAt(z - 1) <= '9') || (comIn.charAt(z - 1) == '.')) && ((comIn.charAt(z + 1) >= '0' and comIn.charAt(z + 1) <= '9') || (comIn.charAt(z + 1) == '.') || (comIn.charAt(z + 1) == '-'))) { //GET COMMAND AND NO
+        pos[1] = z;
+        for (int i = 1 ; (comIn.charAt(z - i) >= '0' and comIn.charAt(z - i) <= '9') || (comIn.charAt(z - i) == '.' || (comIn.charAt(z - i) == '-')); i++) { //RETURN CHAR BY CHAR UNTIL IT FINDS NO NUMBER OR DECIMAL POINT
+          Serial.println("Error 0x01");
+          pos[0] = z - i;
+          rep[0] = z - i;
+        }
+
+        spar[selector] = Capture(comIn, pos);
+        com = comIn.charAt(z);
+        part = 1;
+        selector++;
+      }
+    }
+    if (part == 1) {
+      Serial.println("PART 1 EXECUTING>>>");
+      pos[0] = z;
+      for (int i = 1 ; (comIn.charAt(z + i) >= '0' and comIn.charAt(z + i) <= '9') || (comIn.charAt(z + i) == '.') || (comIn.charAt(z + i) == '-'); i++) { //RETURN CHAR BY CHAR UNTIL IT FINDS NO NUMBER OR DECIMAL POINT OR SIGN
+        pos[1] = z + i;
+        rep[1] = z + i;
+      }
+      spar[selector] = Capture(comIn, pos);
+      com = comIn.charAt(z);
+      part = 3;
+    }
+    if (part == 3) {//FINISHER COLLECTION AND REPLACEMENT
+      Serial.println("PART 3 EXECUTING>>>");
+      part = 0; //Restarts search of new 'operator'
+      selector = 0; //Restarts Parameter/index selector
+      z = 0; //Restarts cursor position
+      comIn = Replace(comIn, EXECUTE(com, spar, comIn), rep[0], rep[1]);
+      Serial.print("OUTPUT>>>");
+      Serial.println(comIn);
+    }
+  }
+  return (comIn);
+}
+
+String Logic(String comIn) { //FINDS VARIABLES TO REPLACE FOR STRINGS
+  int part = 0; //[PART 0 SEARCH FOR GET COMMAND] [PART 1 GET VALUES OR ENDING] [PART 3 EXECUTES]
+  String spar[10]; //PARAMETERS
+  int selector = 0; //SELECTS WHERE TO SAVE THE PARAMETER "INDEX"
+  int pos[2]; //POSITIONS START AND END OF PARAMETER
+  String com; //COMMAND TYPE
+  int rep[2]; //REPLACE PART OF STRING
+
+  for (int z = pos[0] = 0; comIn.charAt(z - 1) != '\n' and comIn.charAt(z - 1) != ';'; z++) { //GO THROUGH CHARACTERS UNTIL IT FINDS THE END OF THE LINE
+    if (part == 0) {
+      if (comIn.charAt(z) == '"') {
+        Serial.print("VALUE OF Z=");
+        Serial.println(z);
+        Serial.println("PASSED IF STATEMENT");
+        Serial.print("CHECKING IF STATEMENT...");
+        Serial.println(comIn.charAt(z) == '"');
+        Serial.print("CHAR AT Z...");
+        Serial.println(comIn.charAt(z));
+        z++;
+        while (comIn.charAt(z) != '"') {
+          z++;
+          Serial.print("CharSkip>>");
+          Serial.println(comIn.charAt(z));
+        }
+        z++;
+        Serial.print("Char afterSkip >>");
+        Serial.println(comIn.charAt(z));
+      }
+
+      if ((comIn.charAt(z) == '>' || comIn.charAt(z) == '<' || (comIn.charAt(z) == '=' && comIn.charAt(z + 1) == '!') || (comIn.charAt(z) == '=' && comIn.charAt(z + 1) == '=') || (comIn.charAt(z) == '<' && comIn.charAt(z + 1) == '=') || (comIn.charAt(z) == '>' && comIn.charAt(z) == '=') )) { //GET COMMAND
+        pos[1] = z;
+        for (int i = 1 ; (comIn.charAt(z - i) >= '0' and comIn.charAt(z - i) <= '9') || (comIn.charAt(z - i) == '.'); i++) { //RETURN CHAR BY CHAR UNTIL IT FINDS NO NUMBER OR DECIMAL POINT OR SIGHN
+          pos[0] = z - i;
+          rep[0] = z - i;
+        }
+        spar[selector] = Capture(comIn, pos);
+        if ((comIn.charAt(z + 1) >= '0' and comIn.charAt(z + 1) <= '9') || (comIn.charAt(z + 1) == '.') || (comIn.charAt(z + 1) == '-'))
+          com = comIn.charAt(z);
+        else {
+          com = comIn.substring(z, z + 2);
+          z++;
+        }
+        part = 1;
+        selector++;
+      }
+    }
+    if (part == 1) {
+      pos[0] = z;
+      if ((comIn.charAt(z + 1) >= '0' and comIn.charAt(z + 1) <= '9') || (comIn.charAt(z + 1) == '.')) {
+        for (int i = 1 ; (comIn.charAt(z + i) >= '0' and comIn.charAt(z + i) <= '9') || (comIn.charAt(z + i) == '.') || (comIn.charAt(z + i) == '-'); i++) { //RETURN CHAR BY CHAR UNTIL IT FINDS NO NUMBER OR DECIMAL POINT OR SIGHN
+          pos[1] = z + i;
+          rep[1] = z + i;
+        }
+      }
+      else {
+        for (int i = 2 ; (comIn.charAt(z + i) >= '0' and comIn.charAt(z + i) <= '9') || (comIn.charAt(z + i) == '.') || (comIn.charAt(z + i) == '-'); i++) { //RETURN CHAR BY CHAR UNTIL IT FINDS NO NUMBER OR DECIMAL POINT OR SIGHN
+          pos[1] = z + i;
+          rep[1] = z + i;
+        }
+      }
+      spar[selector] = Capture(comIn, pos);
+      part = 3;
+    }
+    if (part == 3) {//FINISHER COLLECTION AND REPLACEMENT
+      //Serial.println(com);
+      part = 0; //Restarts search of new 'operator'
+      selector = 0; //Restarts Parameter/index selector
+      z = 0; //Restarts cursor position
+      comIn = Replace(comIn, EXECUTE(com, spar, comIn), rep[0], rep[1]);
+    }
+  }
+  return (comIn);
+
+}
+
+String Capture(String comIn, int pos[]) {
+  Serial.print("pos[0]-1:");
+  Serial.println(comIn.charAt(pos[0] - 1));
+  Serial.print("pos[1]+1:");
+  Serial.println(comIn.charAt(pos[1] + 1));
+  while ((comIn.charAt(pos[0]) < '0' || comIn.charAt(pos[0]) > '9') || comIn.charAt(pos[0]) == '.' || comIn.charAt(pos[0]) == '-' || comIn.charAt(pos[0]) == '"') { //skip characters non-num remove from string 'L'<-999+
+    pos[0]++;
+  }
+  Serial.print("pos[0]:");
+  Serial.println(comIn.charAt(pos[0]));
+  Serial.print("pos[0]-1:");
+  Serial.println(comIn.charAt(pos[0] - 1));
+  while ((comIn.charAt(pos[0] - 1) >= '0' and comIn.charAt(pos[0] - 1 <= '9')) || (comIn.charAt(pos[0] - 1) == '.') || ((comIn.charAt(pos[0] - 1) == '-' && (comIn.charAt(pos[0] - 2) <= '0' and comIn.charAt(pos[0] - 2 >= '9'))))) { //skip characters num add them to string 9->999+
+    pos[0]--;
+    Serial.println("CAPTURED [-1]");
+  }
+  while ((comIn.charAt(pos[1]) < '0' || comIn.charAt(pos[1]) > '9') || (comIn.charAt(pos[1]) == '.' && comIn.charAt(pos[1] - 1) != '-')) { //skip characters non-num remove from string +999->'L'
+    pos[1]--;
+  }
+  while ((comIn.charAt(pos[1] + 1) >= '0' and comIn.charAt(pos[1] + 1) <= '9')) { //skip characters num add them to string +999<-9
+    pos[1]++;
+  }
+  Serial.print("PARAMETER Caught:");
+  Serial.println(comIn.substring(pos[0], pos[1] + 1));
+  return (comIn.substring(pos[0], pos[1] + 1)); //PLUS 1 IS TO AVOID ERROR
+}
+
+String GET(String com, String spar[], String comIn) {
+  if (com == "VAR") {
+    return (String(var[spar[0].toInt()][spar[1].toInt()]));
+  }
+}
+String Replace(String comIn, String newString, int P1, int P2) {
+  return (comIn.substring(0, P1) + newString + (comIn.substring(P2 + 1, comIn.length())));
+}
+
+String EXECUTE(String com, String spar[], String comIn) {
+  //LOGIC COMMANDS///////////////////////////////////////////////
+  //Serial.print("COM: ");
+  //Serial.println(com);
+  if (com == ">=") {
+    //comNew = (comIn.substring( 0, rep[0])) + (String(spar[0].toFloat() >= spar[1].toFloat())) + (comIn.substring(rep[1], comIn.length()));
+    return (String(spar[0].toFloat() >= spar[1].toFloat()));
+  }
+  if (com == "<=") {
+    //comNew = (comIn.substring( 0, rep[0])) + (String(spar[0].toFloat() <= spar[1].toFloat())) + (comIn.substring(rep[1], comIn.length()));
+    return (String(spar[0].toFloat() <= spar[1].toFloat()));
+  }
+  if (com == "==") {
+    //comNew = (comIn.substring( 0, rep[0])) + (String(spar[0].toFloat() == spar[1].toFloat())) + (comIn.substring(rep[1], comIn.length()));
+    return (String(spar[0].toFloat() == spar[1].toFloat()));
+  }
+  if (com == "!=") {
+    //comNew = (comIn.substring( 0, rep[0])) + (String(spar[0].toFloat() != spar[1].toFloat())) + (comIn.substring(rep[1], comIn.length()));
+    return (String(spar[0].toFloat() != spar[1].toFloat()));
+  }
+  if (com.charAt(0) == '>') {
+    //comNew = (comIn.substring( 0, rep[0])) + (String(spar[0].toFloat() > spar[1].toFloat())) + (comIn.substring(rep[1], comIn.length()));
+    return (String(spar[0].toFloat() > spar[1].toFloat()));
+  }
+  if (com.charAt(0) == '<') {
+    //comNew = (comIn.substring( 0, rep[0])) + (String(spar[0].toFloat() < spar[1].toFloat())) + (comIn.substring(rep[1], comIn.length()));
+    return (String(spar[0].toFloat() < spar[1].toFloat()));
+  }
+  //ARITHMETIC COMMANDS///////////////////////////////////////
+  if (com.charAt(0) == '+') {
+    return (String((spar[0].toFloat() + spar[1].toFloat())));
+  }
+  if (com.charAt(0) == '-') {
+    return (String(spar[0].toFloat() - spar[1].toFloat()));
+  }
+  if (com.charAt(0) == '*') {
+    return (String(spar[0].toFloat() * spar[1].toFloat()));
+  }
+  if (com.charAt(0) == '/') {
+    return (String(spar[0].toFloat() / spar[1].toFloat()));
+  }
+  if (com.charAt(0) == '^') {
+    Serial.println(pow(spar[0].toFloat(), spar[1].toFloat()));
+    return (String(pow(spar[0].toFloat(), spar[1].toFloat())));
+  }
+  if (com.charAt(0) == '$') {
+    return (String(sqrt(spar[0].toFloat())));
+  }
+  //VAR COMMANDS//////////////////////////////////////////////////////////////////
+  if (com.charAt(0) == '=') {
+    var[spar[0].toInt()][spar[1].toInt()] = spar[2].toInt();
+    Serial.print("SET: ");
+    Serial.println(spar[2].toInt());
+    return ("1");
+  }
+  //SD COMMANDS///////////////////////////////////////////////////////////////////
+  //GOTO LINE
+  //HARDWARE COMMANDS/////////////////////////////////////////////////////////////
+  if (com == "ISD") {
+    pinMode(spar[0].toInt(), OUTPUT);
+    digitalWrite(spar[0].toInt(), spar[1].toInt());
+    Serial.println("<ISD>");
+    Serial.print("spar[0]:");
+    Serial.println(spar[0]);
+    Serial.print("spar[1]:");
+    Serial.println(spar[1]);
+    return ("1");
+  }
+  if (com == "ISP") {
+    analogWrite(spar[0].toInt(), spar[1].toInt());
+    return ("1");
+  }
+  if (com == "IST") {
+    tone(spar[0].toInt(), spar[1].toInt(), spar[2].toInt());
+    return ("1");
+  }
+  if (com == "IRA") {
+    return (String(analogRead((spar[0].toInt()))));
+  }
+  if (com == "IRD") {
+    return (String(digitalRead((spar[0].toInt()))));
+  }
+  if (com == "DLY") {
+    delay(spar[0].toInt());
+    return ("1");
+  }
+  if (com == "SBL") {
+    digitalWrite(34, spar[0].toInt());
+    return ("1");
+  }
+  if (com == "SDP") {
+    digitalWrite(32, spar[0].toInt());
+    return ("1");
+  }
+  if (com == "SIR") {
+    digitalWrite(30, spar[0].toInt());
+    return ("1");
+  }
+  if (com == "SPK") {
+    digitalWrite(22, spar[0].toInt());
+    return ("1");
+  }
+  if (com == "SXY") {
+    digitalWrite(40, spar[0].toInt());
+    return ("1");
+  }
+  if (com == "SWA") {
+    //Send to Sleep mode
+    return ("1");
+  }
+  if (com == "VAR") {
+    return (String(var[spar[0].toInt()][spar[1].toInt()] = spar[2].toInt()));
+  }
+  if (com == "SSP") {//Send through Serial
+    if (spar[0].toInt() == 0) {
+      if (spar[1].toInt() == 0) {
+        Serial.print(spar[2]);
+      }
+      if (spar[1].toInt() == 1) {
+        //Serial.write(String(spar[2]));
+      }
+    }
+    if (spar[0].toInt() == 1) {
+      if (spar[1].toInt() == 0) {
+        //Serial1.print(spar[2]);
+      }
+      if (spar[1].toInt() == 1) {
+        //Serial1.write(spar[2]);
+      }
+    }
+    if (spar[0].toInt() == 2) {
+      if (spar[1].toInt() == 0) {
+        //Serial2.print(spar[2]);
+      }
+      if (spar[1].toInt() == 1) {
+        //Serial2.write(spar[2]);
+      }
+    }
+    if (spar[0].toInt() == 3) {
+      if (spar[1].toInt() == 0) {
+        //Serial3.print(spar[2]);
+      }
+      if (spar[1].toInt() == 1) {
+        //Serial3.write(spar[2]);
+      }
+    }
+  }
+  if (com == "SPD") {//Set Serial Speed
+
+  }
+  if (com == "DTX") {
+    Serial.print("Sending:");
+    Serial.print(spar[0]);
+    Serial3.print(spar[0]);
+    Serial3.write(0Xff);
+    Serial3.write(0Xff);
+    Serial3.write(0Xff);
+  }
+  if (com == "IRT") {}
+  if (com == "BLE") {}
+  if (com == "IIC") {}
+  if (com == "WEV") {}
+  if (com == "WSE") {}
+  if (com == "WMI") {}
+  if (com == "WHR") {}
+  if (com == "WMO") {}
+  if (com == "WYR") {}
+  if (com == "SDF") {}
+  if (com == "SDG") {}
+  //Variables commands
+  if (com == "") {
+    digitalWrite(40, spar[0].toInt());
+    return ("1");
+  }
+  return (spar[0]);
+}
